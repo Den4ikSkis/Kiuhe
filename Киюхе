@@ -1,3 +1,0 @@
-git switch main
-git pull origin main
-git switch -c develop
