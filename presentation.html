@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KiuhaBot — как разрабатывался</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", Tahoma, sans-serif; background:#0f1115; color:#e8e8e8; }
+  .slides { width:100%; height:100vh; overflow:hidden; position:relative; }
+  .slide {
+    position:absolute; inset:0; display:none; flex-direction:column;
+    justify-content:center; padding:5vh 9vw;
+  }
+  .slide.active { display:flex; }
+  h1 { font-size:3.4rem; color:#7ee787; margin-bottom:1rem; }
+  h2 { font-size:2.4rem; color:#7ee787; margin-bottom:1.4rem; }
+  p, li { font-size:1.2rem; line-height:1.55; }
+  ul, ol { margin-left:2rem; }
+  li { margin-bottom:.6rem; }
+  .sub { color:#9aa0a6; font-size:1.05rem; }
+  .tag { display:inline-block; background:#21262d; border:1px solid #30363d; border-radius:20px; padding:.3rem 1rem; margin:.2rem; font-size:1rem; }
+  .err { color:#ff7b72; font-weight:bold; }
+  .ok { color:#7ee787; font-weight:bold; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+  .card { background:#161b22; border:1px solid #30363d; border-radius:12px; padding:1.1rem 1.3rem; }
+  .card h3 { color:#79c0ff; margin-bottom:.5rem; font-size:1.2rem; }
+  .card li { font-size:1.05rem; }
+  .num { color:#d2a8ff; font-weight:bold; }
+  .nav { position:fixed; bottom:20px; left:0; width:100%; text-align:center; color:#6e7681; font-size:.95rem; }
+  .counter { position:fixed; bottom:20px; right:30px; color:#6e7681; }
+  .steps span { display:block; margin-bottom:.45rem; }
+  td { padding:.5rem .7rem; font-size:1rem; }
+</style>
+</head>
+<body>
+<div class="slides">
+
+  <div class="slide active">
+    <h1>Telegram-бот Kiuha</h1>
+    <p class="sub">Как разрабатывался: порядок, трудности, ошибки, итог</p>
+    <p style="margin-top:1.6rem">
+      <span class="tag">Python 3.11</span><span class="tag">XTTS v2</span>
+      <span class="tag">Ollama / Qwen3.5-4B</span><span class="tag">python-telegram-bot</span>
+    </p>
+    <p class="sub" style="margin-top:1rem">Проект собирался с нуля: от выбора стека до рабочего бота, который отвечает голосом друга.</p>
+  </div>
+
+  <div class="slide">
+    <h2>Идея и цель</h2>
+    <ul>
+      <li>Бот <b>@kiuhabot</b> получает текстовое сообщение — но реагирует только тогда, когда в нём есть обращение по имени: «Киюха», «Кирюха», «Киюх» и варианты. Обычный текст в чате он пропускает и не отвечает.</li>
+      <li>Вместо заготовленных фраз используется нейросеть (LLM): она читает сообщение и сама придумывает живой, дружелюбный ответ по-русски — как отвечал бы настоящий друг.</li>
+      <li>Полученный текст озвучивается моделью XTTS v2 <b>голосом друга</b>. В качестве эталона используется запись friend.wav длиной 30 секунд — именно с неё модель «копирует» тембр и интонацию.</li>
+      <li>Готовый аудиофайл отправляется обратно в чат голосовым сообщением.</li>
+    </ul>
+    <p class="sub" style="margin-top:1.2rem">Дополнительные условия: из-за санкций облачный ElevenLabs недоступен, поэтому синтез делается локально. Хозяин проекта «полный ноль» в программировании — поэтому всё приходилось настраивать и писать за него, а в конце подготовить понятную инструкцию.</p>
+  </div>
+
+  <div class="slide">
+    <h2>Порядок разработки</h2>
+    <div class="steps">
+      <p><span class="num">1.</span> Выбор стека. Облачные сервисы озвучки отпали сразу — взяли локальный Coqui TTS (модель XTTS v2), а за «ум» ответа — локальную нейросеть Ollama.</p>
+      <p><span class="num">2.</span> Подготовка окружения. Системный Python 3.14 оказался несовместим, поэтому поставили отдельный Python 3.11 в D:\Python и установили все библиотеки (TTS, python-telegram-bot, httpx, torch).</p>
+      <p><span class="num">3.</span> Голос друга. Оригинальная запись friend_full.wav длилась больше 10 минут и весила 65 МБ — для XTTS достаточно короткого эталона, поэтому её обрезали до 30 секунд.</p>
+      <p><span class="num">4.</span> Сборка TTS. Библиотека содержит C++-расширения, которые пришлось компилировать: доустановили компилятор MSVC и Windows SDK.</p>
+      <p><span class="num">5.</span> Первый синтез. Проверили, что из текста получается корректный WAV-файл с нужным голосом (voice.wav).</p>
+      <p><span class="num">6.</span> Telegram. Вписали токен bots, подключили обработчик сообщений и организовали автозапуск через Планировщик задач Windows (задача KiuhaBot).</p>
+      <p><span class="num">7.</span> Мозги. Подключили Ollama через HTTP API, перебрали несколько моделей и остановились на лёгкой Qwen3.5-4B.</p>
+      <p><span class="num">8.</span> Финальные доработки. Фильтр обращения по имени, защита от эмодзи, увеличенные таймауты, исправление имени модели и инструкция Read_Me.txt для хозяина.</p>
+    </div>
+  </div>
+
+  <div class="slide">
+    <h2>Трудности №1 — сеть и сборка</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Санкции и соединения</h3>
+        <ul>
+          <li>ElevenLabs недоступен из-за санкций — заменили на локальную модель XTTS v2, которая вообще не требует интернета для синтеза.</li>
+          <li>Telegram напрямую не отвечал — подключили VPN Happ (туннель xray); только после этого бот смог подключаться к API.</li>
+          <li>Скачивание модели с облачного хранилища cloudflare постоянно обрывалось — перешли на зеркала modelscope.cn и hf.co, с которых модели скачались нормально.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Компиляция C++</h3>
+        <ul>
+          <li>Библиотека TTS собирает часть кода на C++ — без компилятора MSVC установка падала.</li>
+          <li>Даже с компилятором не хватало заголовочного файла <span class="err">io.h</span> из Windows SDK.</li>
+          <li>Пришлось вручную скачать и переустановить Windows SDK версии 10.0.26100 — после этого нужный файл появился и сборка прошла успешно.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide">
+    <h2>Трудности №2 — версии и выбор модели</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Конфликты библиотек</h3>
+        <ul>
+          <li>Новая версия transformers 5.x сломала компонент <span class="err">BeamSearchScorer</span> — пришлось понизить до 4.46.3.</li>
+          <li>torch 2.15 не мог загрузить веса модели — откатились на torch 2.5.1+cpu.</li>
+          <li>Системный Python 3.14 не поддерживал часть библиотек — использовали отдельный Python 3.11.4.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Подбор нейросети</h3>
+        <ul>
+          <li>Qwen2.5-7B оказалась тяжёлой: вместе с TTS компьютер с 8 ГБ видеопамяти RTX 3060 Ti «задыхался».</li>
+          <li>Qwen3.5-4B оказалась моделью с «размышлениями»: при маленьком лимите токенов весь бюджет уходил на мысли, а видимый ответ получался пустым.</li>
+          <li>Решение: взять ту же 4B-модель, но включить режим <span class="ok">think:false</span> — она стала отвечать сразу и заметно легче грузила систему.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide">
+    <h2>Ошибки и как их исправляли</h2>
+    <table style="width:100%; border-collapse:collapse;">
+      <tr style="border-bottom:1px solid #30363d;"><td class="err">speaker_wav_path</td><td>Неверное имя параметра. В TTS 0.22.0 он называется <span class="ok">speaker_wav</span> — иначе модель жаловалась, что не задан голос.</td></tr>
+      <tr style="border-bottom:1px solid #30363d;"><td class="err">Application.token=</td><td>Неправильный способ передать токен. Верный вызов: <span class="ok">Application.builder().token(...).build()</span>.</td></tr>
+      <tr style="border-bottom:1px solid #30363d;"><td class="err">TimedOut (Telegram)</td><td>Бот не мог связаться с API. Решение: включить VPN Happ и увеличить таймауты подключения и чтения до 90 секунд.</td></tr>
+      <tr style="border-bottom:1px solid #30363d;"><td class="err">UnicodeEncodeError (эмодзи)</td><td>Нейросеть вставила в ответ эмодзи, а модуль озвучки через кодировку cp1251 не смог его записать. Добавили фильтр, который убирает эмодзи перед синтезом.</td></tr>
+      <tr style="border-bottom:1px solid #30363d;"><td class="err">Модель ARA не найдена</td><td>В коде осталось название модели от незавершённой вчерашней правки. Проверили папку моделей и заменили на реально установленную SOMPOA.</td></tr>
+    </table>
+  </div>
+
+  <div class="slide">
+    <h2>Итог</h2>
+    <ul>
+      <li class="ok">Бот успешно отвечает голосом друга — но только когда к нему обращаются по имени (Киюха, Кирюха, Киюх). Обычные сообщения он игнорирует.</li>
+      <li class="ok">Всё работает локально и без облачных сервисов: синтез голоса идёт на процессоре, а нейросеть Qwen3.5-4B — на видеокарте RTX 3060 Ti. Скорость и нагрузка устраивают.</li>
+      <li class="ok">Запуск автоматизирован: задача Планировщика KiuhaBot поднимает бота при входе в Windows, а при падении его можно запустить вручную.</li>
+      <li class="ok">Для хозяина подготовлен файл Read_Me.txt — понятная инструкция, что нужно включить (VPN, Ollama) и как запустить/остановить бота, чтобы не дёргать меня по мелочам.</li>
+      <li class="ok">Файлы проекта лежат в D:\Python\projects\: bot.py (код), run_bot.bat (запуск), friend.wav (голос друга), Read_Me.txt (инструкция).</li>
+      <li class="ok">Эту презентацию также подготовил я — по просьбе хозяина, чтобы зафиксировать весь путь разработки: порядок шагов, сложности, ошибки и то, как они были решены.</li>
+    </ul>
+  </div>
+
+  <div class="slide">
+    <h1 style="color:#79c0ff">Вопросы?</h1>
+    <p class="sub">KiuhaBot · 2026</p>
+  </div>
+
+</div>
+<div class="nav">← → или пробел — листать</div>
+<div class="counter" id="c">1 / 9</div>
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let i = 0;
+  function show(n){
+    i = (n + slides.length) % slides.length;
+    slides.forEach((s,k)=>s.classList.toggle('active', k===i));
+    document.getElementById('c').textContent = (i+1) + ' / ' + slides.length;
+  }
+  document.addEventListener('keydown', e=>{
+    if(['ArrowRight',' ','PageDown'].includes(e.key)){ e.preventDefault(); show(i+1); }
+    if(['ArrowLeft','PageUp'].includes(e.key)){ e.preventDefault(); show(i-1); }
+    if(e.key==='Home') show(0);
+    if(e.key==='End') show(slides.length-1);
+  });
+</script>
+</body>
+</html>
